@@ -3,7 +3,7 @@ import pandas as pd
 import altair as alt
 
 def main():
-    st.title("Excel Uploader: Disposition vs. Reach (TwFollowers + WebsiteViews)")
+    st.title("ShadeShift (Disposition Checker)")
     st.write(
         "Upload an Excel file with columns: "
         "**Name**, **Handle**, **Faction**, **Disposition**, **Tags**, **Bio**, "
