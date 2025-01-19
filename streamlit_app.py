@@ -91,7 +91,7 @@ def main():
         x_axis = alt.X(
             "Disposition:Q",
             title="Disposition (Left: -5, Right: +5)",
-            scale=alt.Scale(domain=(-5, 5))
+            scale=alt.Scale(domain=(-6, 6))
         )
 
         # Y-axis: Reach (log scale)
