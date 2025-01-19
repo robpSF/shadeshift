@@ -19,28 +19,35 @@ def main():
             st.error(f"Missing required columns: {missing_cols}")
             return
 
-        # Convert Disposition to numeric if necessary (handle invalid data)
+        # Convert to numeric
         df["Disposition"] = pd.to_numeric(df["Disposition"], errors="coerce")
         df["TwFollowers"] = pd.to_numeric(df["TwFollowers"], errors="coerce")
 
-        # Drop rows with invalid data
+        # Drop rows with invalid data or zero/negative TwFollowers
         df = df.dropna(subset=["Disposition", "TwFollowers"])
+        df = df[df["TwFollowers"] > 0]
 
         st.write("### Data Preview")
         st.dataframe(df.head())
 
         st.write("### Disposition vs TwFollowers (Log Scale)")
 
-        # Create the Altair chart
+        # Create Altair chart with auto y-domain
         chart = (
             alt.Chart(df)
             .mark_circle(size=60)
             .encode(
-                x=alt.X("Disposition:Q", title="Disposition (Left: -5, Right: +5)", scale=alt.Scale(domain=(-5, 5))),
+                x=alt.X(
+                    "Disposition:Q",
+                    title="Disposition (Left: -5, Right: +5)",
+                    # Remove domain if you want to let data drive x-axis
+                    scale=alt.Scale(domain=(-5, 5))
+                ),
                 y=alt.Y(
                     "TwFollowers:Q",
                     title="Twitter Followers (log scale)",
-                    scale=alt.Scale(type="log", nice=True),
+                    scale=alt.Scale(type="log")
+                    # No domain => automatically determined by Altair
                 ),
                 tooltip=["Name", "Disposition", "TwFollowers"]
             )
