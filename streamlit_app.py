@@ -3,7 +3,7 @@ import pandas as pd
 import altair as alt
 
 def main():
-    st.title("ShadeShift (Disposition Checker)")
+    st.title("ShadeShift (Disposition checker)")
     st.write(
         "Upload an Excel file with columns: "
         "**Name**, **Handle**, **Faction**, **Disposition**, **Tags**, **Bio**, "
@@ -31,31 +31,42 @@ def main():
             return
 
         # ---------------------
-        # 3. Convert to numeric
+        # 3. Convert numeric columns where needed
         # ---------------------
         df["Disposition"] = pd.to_numeric(df["Disposition"], errors="coerce")
         df["TwFollowers"] = pd.to_numeric(df["TwFollowers"], errors="coerce")
         df["WebsiteViews"] = pd.to_numeric(df["WebsiteViews"], errors="coerce")
 
-        # Drop rows that have NaN in critical columns
+        # Drop rows with missing data in critical columns
         df.dropna(subset=["Disposition", "TwFollowers", "WebsiteViews"], inplace=True)
 
         # ---------------------
         # 4. Compute Reach = TwFollowers + WebsiteViews
         # ---------------------
         df["Reach"] = df["TwFollowers"] + df["WebsiteViews"]
-        
-        # Remove rows where Reach <= 0 (log scale requires > 0)
+
+        # Remove rows where Reach <= 0 (log scale needs positive)
         df = df[df["Reach"] > 0]
 
         # ---------------------
-        # 5. Preview Data
+        # 5. Parse the CSV Tags into a list of tags
+        # ---------------------
+        # Create a new column of Python lists, e.g. ["tag1","tag2"] for a row
+        df["TagList"] = df["Tags"].fillna("").apply(
+            lambda x: [t.strip() for t in x.split(",") if t.strip() != ""]
+        )
+
+        # Gather all unique tags from the entire DataFrame
+        all_unique_tags = sorted(set(tag for tags in df["TagList"] for tag in tags))
+
+        # ---------------------
+        # 6. Preview Data
         # ---------------------
         st.write("### Data Preview")
         st.dataframe(df.head())
 
         # ---------------------
-        # 6. Filters (Faction & Tags)
+        # 7. Filter by Faction
         # ---------------------
         all_factions = sorted(df["Faction"].dropna().unique())
         selected_factions = st.multiselect(
@@ -65,33 +76,41 @@ def main():
         )
         df = df[df["Faction"].isin(selected_factions)]
 
-        all_tags = sorted(df["Tags"].dropna().unique())
+        # ---------------------
+        # 8. Filter by individual Tags
+        # ---------------------
         selected_tags = st.multiselect(
             label="Filter by Tag",
-            options=all_tags,
-            default=all_tags
+            options=all_unique_tags,
+            default=all_unique_tags
         )
-        df = df[df["Tags"].isin(selected_tags)]
+
+        # If user de-selects everything, optionally show everything or nothing:
+        # For now, we'll show only rows that match any selected tag (if tags are chosen)
+        if selected_tags:
+            df = df[df["TagList"].apply(lambda row_tags: any(t in row_tags for t in selected_tags))]
 
         st.write("### Disposition vs. Reach (Log Scale)")
 
         # ---------------------
-        # 7. Toggle for using images vs. circle markers
+        # 9. Toggle for using images vs. circle markers
         # ---------------------
         use_images = st.checkbox("Display images instead of circles", value=False)
 
-        # ---------------------
-        # 8. Build the Altair chart
-        # ---------------------
+        # If no rows left, warn and exit
         if df.empty:
             st.warning("No data available after filtering.")
             return
 
-        # X-axis: Disposition (fixed domain from -5 to 5)
+        # ---------------------
+        # 10. Build the Altair chart
+        # ---------------------
+
+        # X-axis: Disposition
         x_axis = alt.X(
             "Disposition:Q",
             title="Disposition (Left: -5, Right: +5)",
-            scale=alt.Scale(domain=(-6, 6))
+            scale=alt.Scale(domain=(-5, 5))
         )
 
         # Y-axis: Reach (log scale)
@@ -101,19 +120,18 @@ def main():
             scale=alt.Scale(type="log")
         )
 
-        # Common tooltip
+        # Tooltip
         tooltip = ["Name", "Faction", "Tags", "Disposition", "Reach", "TwFollowers", "WebsiteViews"]
 
         if use_images:
-            # If using images, mark_image must have 'url' bound to the "Image" column
-            # Note: mark_image doesn't support color channel for the images themselves
+            # Use the image URL from the 'Image' column
             chart = (
                 alt.Chart(df)
                 .mark_image(width=40, height=40)
                 .encode(
                     x=x_axis,
                     y=y_axis,
-                    url="Image:N",  # The image URL should be in this column
+                    url="Image:N",  # Should be a valid, accessible image URL
                     tooltip=tooltip
                 )
                 .interactive()
@@ -121,9 +139,9 @@ def main():
         else:
             # Circle markers with color condition
             color_condition = alt.condition(
-                "datum.Disposition < 0",  # A JavaScript expression
-                alt.value("red"),         # Color if true
-                alt.value("blue")         # Color if false
+                "datum.Disposition < 0",
+                alt.value("red"),
+                alt.value("blue")
             )
 
             chart = (
@@ -139,6 +157,7 @@ def main():
             )
 
         st.altair_chart(chart, use_container_width=True)
+
 
 if __name__ == "__main__":
     main()
